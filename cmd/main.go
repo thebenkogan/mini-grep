@@ -59,7 +59,13 @@ func NewMatcher(pattern string) (Matcher, error) {
 		return Word{}, nil
 	default:
 		if pattern[0] == '[' && pattern[len(pattern)-1] == ']' {
-			return CharGroup(pattern[1 : len(pattern)-1]), nil
+			group := pattern[1 : len(pattern)-1]
+			negative := false
+			if group[0] == '^' {
+				negative = true
+				group = group[1:]
+			}
+			return CharGroup{group, negative}, nil
 		}
 
 		if len(pattern) != 1 {
@@ -93,8 +99,15 @@ func (_ Word) matches(char rune) bool {
 	return isDigit || isCapitalLetter || isLowerLetter || isUnderscore
 }
 
-type CharGroup string
+type CharGroup struct {
+	group    string
+	negative bool
+}
 
-func (g CharGroup) matches(char rune) bool {
-	return slices.Contains([]rune(g), char)
+func (cg CharGroup) matches(char rune) bool {
+	inGroup := slices.Contains([]rune(cg.group), char)
+	if cg.negative {
+		return !inGroup
+	}
+	return inGroup
 }
