@@ -14,15 +14,23 @@ func TestGrep(t *testing.T) {
 	}{
 		{"apple", "a", true},
 		{"dog", "a", false},
+
 		{"apple123", `\d`, true},
 		{"c", `\d`, false},
+
 		{"foo101", `\w`, true},
 		{"$!?", `\w`, false},
+
 		{"apple", `[abc]`, true},
 		{"dog", `[abc]`, false},
 		{"[]", `[abc]`, false},
+
 		{"dog", `[^abc]`, true},
 		{"cab", `[^abc]`, false},
+
+		{"1 apple", `\d apple`, true},
+		{"BK: 123-456", `\w\w: \d\d\d-\d\d\d`, true},
+		{"BK: 12-3456", `\w\w: \d\d\d-\d\d\d`, false},
 	}
 
 	for _, tt := range grepTests {

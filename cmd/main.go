@@ -5,9 +5,10 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 )
 
-// Usage: echo <input_text> | your_grep.sh -E <pattern>
+// Usage: echo <input_text> | ./build/main -E <pattern>
 func main() {
 	if len(os.Args) < 3 || os.Args[1] != "-E" {
 		fmt.Println("usage: mygrep -E <pattern>")
@@ -18,7 +19,7 @@ func main() {
 
 	ok, err := executePattern(os.Stdin, pattern)
 	if err != nil {
-		fmt.Println("failed to execute pattern on input", err)
+		fmt.Println("failed to execute pattern on input:", err)
 		os.Exit(2)
 	}
 
@@ -28,7 +29,7 @@ func main() {
 }
 
 func executePattern(reader io.Reader, pattern string) (bool, error) {
-	matcher, err := NewMatcher(pattern)
+	matchers, err := parsePattern(pattern)
 	if err != nil {
 		return false, err
 	}
@@ -37,48 +38,69 @@ func executePattern(reader io.Reader, pattern string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	line := string(data)
+	line := string(data) // TODO: read char by char
 
-	for _, c := range line {
-		if matcher.matches(c) {
+	for i := 0; i < len(line)-len(matchers)+1; i++ {
+		matchesAll := true
+		for j := 0; j < len(matchers); j++ {
+			if !matchers[j].matches(rune(line[i+j])) {
+				matchesAll = false
+				break
+			}
+		}
+		if matchesAll {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-type Matcher interface {
-	matches(char rune) bool
+func parsePattern(pattern string) ([]Matcher, error) {
+	matchers := make([]Matcher, 0)
+	i := 0
+	for i < len(pattern) {
+		switch pattern[i] {
+		case '\\':
+			matcher, err := NewMetaCharacter(pattern[i : i+2])
+			if err != nil {
+				return nil, err
+			}
+			matchers = append(matchers, matcher)
+			i += 2
+		case '[':
+			closing := strings.Index(pattern[i:], "]")
+			if closing == -1 {
+				return nil, fmt.Errorf("unclosed character group: %q", pattern[i:])
+			}
+			matchers = append(matchers, NewCharacterGroup(pattern[i+1:closing]))
+			i = closing + 1
+		default:
+			matchers = append(matchers, Char(pattern[i]))
+			i += 1
+		}
+	}
+	return matchers, nil
 }
 
-func NewMatcher(pattern string) (Matcher, error) {
-	switch pattern {
-	case `\d`:
-		return Digit{}, nil
-	case `\w`:
-		return Word{}, nil
-	default:
-		if pattern[0] == '[' && pattern[len(pattern)-1] == ']' {
-			group := pattern[1 : len(pattern)-1]
-			negative := false
-			if group[0] == '^' {
-				negative = true
-				group = group[1:]
-			}
-			return CharGroup{group, negative}, nil
-		}
-
-		if len(pattern) != 1 {
-			return nil, fmt.Errorf("unsupported pattern: %q", pattern)
-		}
-		return Char(pattern[0]), nil
-	}
+type Matcher interface {
+	matches(char rune) bool
 }
 
 type Char rune
 
 func (c Char) matches(char rune) bool {
 	return rune(c) == char
+}
+
+func NewMetaCharacter(pattern string) (Matcher, error) {
+	switch pattern {
+	case `\d`:
+		return Digit{}, nil
+	case `\w`:
+		return Word{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported meta character: %q", pattern)
+	}
 }
 
 type Digit struct{}
@@ -102,6 +124,15 @@ func (_ Word) matches(char rune) bool {
 type CharGroup struct {
 	group    string
 	negative bool
+}
+
+func NewCharacterGroup(group string) CharGroup {
+	negative := false
+	if group[0] == '^' {
+		negative = true
+		group = group[1:]
+	}
+	return CharGroup{group, negative}
 }
 
 func (cg CharGroup) matches(char rune) bool {
