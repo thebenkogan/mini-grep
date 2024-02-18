@@ -14,11 +14,18 @@ func TestGrep(t *testing.T) {
 	}{
 		{"apple", "a", true},
 		{"dog", "a", false},
+		{"apple123", `\d`, true},
+		{"c", `\d`, false},
 	}
 
 	for _, tt := range grepTests {
 		t.Run(fmt.Sprintf("input: %q, pattern: %q", tt.input, tt.pattern), func(t *testing.T) {
-			got, _ := executePattern(bytes.NewBufferString(tt.input), tt.pattern)
+			got, err := executePattern(bytes.NewBufferString(tt.input), tt.pattern)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			if got != tt.want {
 				t.Errorf("got %v want %v", got, tt.want)
 			}
