@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 )
 
 // Usage: echo <input_text> | your_grep.sh -E <pattern>
@@ -57,6 +58,10 @@ func NewMatcher(pattern string) (Matcher, error) {
 	case `\w`:
 		return Word{}, nil
 	default:
+		if pattern[0] == '[' && pattern[len(pattern)-1] == ']' {
+			return CharGroup(pattern[1 : len(pattern)-1]), nil
+		}
+
 		if len(pattern) != 1 {
 			return nil, fmt.Errorf("unsupported pattern: %q", pattern)
 		}
@@ -86,4 +91,10 @@ func (_ Word) matches(char rune) bool {
 	isLowerLetter := code >= 97 && code <= 122
 	isUnderscore := code == 95
 	return isDigit || isCapitalLetter || isLowerLetter || isUnderscore
+}
+
+type CharGroup string
+
+func (g CharGroup) matches(char rune) bool {
+	return slices.Contains([]rune(g), char)
 }
