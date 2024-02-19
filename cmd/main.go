@@ -29,19 +29,7 @@ func main() {
 }
 
 func executePattern(reader io.Reader, pattern string) (bool, error) {
-	assertStartOfLine := false
-	if pattern[0] == '^' {
-		assertStartOfLine = true
-		pattern = pattern[1:]
-	}
-
-	assertEndOfLine := false
-	if pattern[len(pattern)-1] == '$' {
-		assertEndOfLine = true
-		pattern = pattern[:len(pattern)-1]
-	}
-
-	matchers, err := parsePattern(pattern)
+	regex, err := NewRegex(pattern)
 	if err != nil {
 		return false, err
 	}
@@ -50,64 +38,128 @@ func executePattern(reader io.Reader, pattern string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	line := string(data) // TODO: read char by char
+	line := string(data)
 
-	start := 0
-	if assertEndOfLine {
-		start = len(line) - len(matchers)
+	return regex.match(line), nil
+}
+
+type Regex struct {
+	matchers    []Matcher
+	assertStart bool
+	assertEnd   bool
+}
+
+func NewRegex(regex string) (*Regex, error) {
+	assertStart := false
+	if regex[0] == '^' {
+		assertStart = true
+		regex = regex[1:]
 	}
 
-	end := len(line) - len(matchers) + 1
-	if assertStartOfLine {
-		end = 1
+	assertEnd := false
+	if regex[len(regex)-1] == '$' {
+		assertEnd = true
+		regex = regex[:len(regex)-1]
 	}
 
-	for i := start; i < end; i++ {
-		matchesAll := true
-		for j := 0; j < len(matchers); j++ {
-			if !matchers[j].matches(rune(line[i+j])) {
-				matchesAll = false
-				break
+	matchers, err := parsePattern(regex)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Regex{
+		matchers,
+		assertStart,
+		assertEnd,
+	}, nil
+}
+
+func (r *Regex) match(text string) bool {
+	if r.assertStart {
+		return matchHere(r.matchers, text, r.assertEnd)
+	}
+
+	for i := 0; i < len(text)-len(r.matchers)+1; i++ {
+		if matchHere(r.matchers, text[i:], r.assertEnd) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchHere(matchers []Matcher, text string, assertEnd bool) bool {
+	if len(matchers) == 0 {
+		return !assertEnd || text == ""
+	}
+
+	matcher := matchers[0]
+	c := rune(text[0])
+	if !matcher.symbol.matches(c) {
+		return false
+	}
+
+	if matcher.quantifier != ' ' {
+		remainingStart := 0
+		for remainingStart < len(text) && matcher.symbol.matches(rune(text[remainingStart])) {
+			remainingStart += 1
+			if matchHere(matchers[1:], text[remainingStart:], assertEnd) {
+				return true
 			}
 		}
-		if matchesAll {
-			return true, nil
-		}
-		if assertStartOfLine {
-			break
-		}
+		return false
 	}
-	return false, nil
+
+	if len(text) > 0 {
+		return matchHere(matchers[1:], text[1:], assertEnd)
+	}
+
+	return false
+}
+
+type Matcher struct {
+	symbol     Symbol
+	quantifier rune
 }
 
 func parsePattern(pattern string) ([]Matcher, error) {
 	matchers := make([]Matcher, 0)
+
 	i := 0
 	for i < len(pattern) {
+		var symbol Symbol
+		var err error
 		switch pattern[i] {
 		case '\\':
-			matcher, err := NewMetaCharacter(pattern[i : i+2])
+			symbol, err = NewMetaCharacter(pattern[i : i+2])
 			if err != nil {
 				return nil, err
 			}
-			matchers = append(matchers, matcher)
 			i += 2
 		case '[':
 			closing := strings.Index(pattern[i:], "]")
 			if closing == -1 {
 				return nil, fmt.Errorf("unclosed character group: %q", pattern[i:])
 			}
-			matchers = append(matchers, NewCharacterGroup(pattern[i+1:closing]))
+			symbol = NewCharacterGroup(pattern[i+1 : closing])
 			i = closing + 1
 		default:
-			matchers = append(matchers, Char(pattern[i]))
+			symbol = Char(pattern[i])
 			i += 1
 		}
+
+		matcher := Matcher{symbol, ' '}
+		if i < len(pattern) && pattern[i] == '+' {
+			matcher.quantifier = '+'
+			i += 1
+		}
+		matchers = append(matchers, matcher)
 	}
+
 	return matchers, nil
 }
 
-type Matcher interface {
+type Symbol interface {
 	matches(char rune) bool
 }
 
@@ -117,7 +169,7 @@ func (c Char) matches(char rune) bool {
 	return rune(c) == char
 }
 
-func NewMetaCharacter(pattern string) (Matcher, error) {
+func NewMetaCharacter(pattern string) (Symbol, error) {
 	switch pattern {
 	case `\d`:
 		return Digit{}, nil

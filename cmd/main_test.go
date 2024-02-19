@@ -38,6 +38,12 @@ func TestGrep(t *testing.T) {
 		{"dog", `dog$`, true},
 		{"dogs", `dog$`, false},
 		{"dog", `^dog$`, true},
+
+		{"apple", `a+`, true},
+		{"SaaS", `a+`, true},
+		{"dog", `a+`, false},
+		{"baaadaaac", `a+e`, false},
+		{"baaad", `a+a`, true},
 	}
 
 	for _, tt := range grepTests {
