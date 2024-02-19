@@ -29,6 +29,12 @@ func main() {
 }
 
 func executePattern(reader io.Reader, pattern string) (bool, error) {
+	assertStartOfLine := false
+	if pattern[0] == '^' {
+		assertStartOfLine = true
+		pattern = pattern[1:]
+	}
+
 	matchers, err := parsePattern(pattern)
 	if err != nil {
 		return false, err
@@ -50,6 +56,9 @@ func executePattern(reader io.Reader, pattern string) (bool, error) {
 		}
 		if matchesAll {
 			return true, nil
+		}
+		if assertStartOfLine {
+			break
 		}
 	}
 	return false, nil

@@ -29,8 +29,11 @@ func TestGrep(t *testing.T) {
 		{"cab", `[^abc]`, false},
 
 		{"1 apple", `\d apple`, true},
-		{"BK: 123-456", `\w\w: \d\d\d-\d\d\d`, true},
-		{"BK: 12-3456", `\w\w: \d\d\d-\d\d\d`, false},
+		{"app - BK: 123-456", `\w\w: \d\d\d-\d\d\d`, true},
+		{"app - BK: 12-3456", `\w\w: \d\d\d-\d\d\d`, false},
+
+		{"log", `^log`, true},
+		{"slog", `^log`, false},
 	}
 
 	for _, tt := range grepTests {
