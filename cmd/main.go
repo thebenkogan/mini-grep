@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"slices"
 	"strings"
@@ -79,7 +80,7 @@ func (r *Regex) match(text string) bool {
 		return matchHere(r.matchers, text, r.assertEnd)
 	}
 
-	for i := 0; i < len(text)-len(r.matchers)+1; i++ {
+	for i := 0; i < len(text); i++ {
 		if matchHere(r.matchers, text[i:], r.assertEnd) {
 			return true
 		}
@@ -92,21 +93,30 @@ func matchHere(matchers []Matcher, text string, assertEnd bool) bool {
 	if len(matchers) == 0 {
 		return !assertEnd || text == ""
 	}
-
 	matcher := matchers[0]
-	if !matcher.symbol.matches(rune(text[0])) {
+	if len(text) == 0 && matcher.quantifier == nil {
 		return false
 	}
 
-	if matcher.quantifier != ' ' {
-		for remainingStart := 1; remainingStart < len(text)+1; remainingStart++ {
-			if matchHere(matchers[1:], text[remainingStart:], assertEnd) {
+	if matcher.quantifier != nil {
+		for i := 0; i < matcher.quantifier.low; i++ {
+			if !matcher.symbol.matches(rune(text[i])) {
+				return false
+			}
+		}
+
+		for i := matcher.quantifier.low; i < len(text)+1 && i <= matcher.quantifier.high; i++ {
+			if matchHere(matchers[1:], text[i:], assertEnd) {
 				return true
 			}
-			if !matcher.symbol.matches(rune(text[remainingStart])) {
+			if !matcher.symbol.matches(rune(text[i])) {
 				break
 			}
 		}
+		return false
+	}
+
+	if !matcher.symbol.matches(rune(text[0])) {
 		return false
 	}
 
@@ -117,9 +127,19 @@ func matchHere(matchers []Matcher, text string, assertEnd bool) bool {
 	return false
 }
 
+type Range struct {
+	low  int
+	high int
+}
+
+var quantifierToRange = map[rune]Range{
+	'+': {1, math.MaxInt},
+	'?': {0, 1},
+}
+
 type Matcher struct {
 	symbol     Symbol
-	quantifier rune
+	quantifier *Range
 }
 
 func parsePattern(pattern string) ([]Matcher, error) {
@@ -148,10 +168,12 @@ func parsePattern(pattern string) ([]Matcher, error) {
 			i += 1
 		}
 
-		matcher := Matcher{symbol, ' '}
-		if i < len(pattern) && pattern[i] == '+' {
-			matcher.quantifier = '+'
-			i += 1
+		matcher := Matcher{symbol, nil}
+		if i < len(pattern) {
+			if r, ok := quantifierToRange[rune(pattern[i])]; ok {
+				matcher.quantifier = &r
+				i += 1
+			}
 		}
 		matchers = append(matchers, matcher)
 	}
