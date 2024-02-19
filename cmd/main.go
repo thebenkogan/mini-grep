@@ -35,6 +35,12 @@ func executePattern(reader io.Reader, pattern string) (bool, error) {
 		pattern = pattern[1:]
 	}
 
+	assertEndOfLine := false
+	if pattern[len(pattern)-1] == '$' {
+		assertEndOfLine = true
+		pattern = pattern[:len(pattern)-1]
+	}
+
 	matchers, err := parsePattern(pattern)
 	if err != nil {
 		return false, err
@@ -46,7 +52,17 @@ func executePattern(reader io.Reader, pattern string) (bool, error) {
 	}
 	line := string(data) // TODO: read char by char
 
-	for i := 0; i < len(line)-len(matchers)+1; i++ {
+	start := 0
+	if assertEndOfLine {
+		start = len(line) - len(matchers)
+	}
+
+	end := len(line) - len(matchers) + 1
+	if assertStartOfLine {
+		end = 1
+	}
+
+	for i := start; i < end; i++ {
 		matchesAll := true
 		for j := 0; j < len(matchers); j++ {
 			if !matchers[j].matches(rune(line[i+j])) {
