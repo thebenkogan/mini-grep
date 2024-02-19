@@ -134,6 +134,7 @@ type Range struct {
 
 var quantifierToRange = map[rune]Range{
 	'+': {1, math.MaxInt},
+	'*': {0, math.MaxInt},
 	'?': {0, 1},
 }
 
