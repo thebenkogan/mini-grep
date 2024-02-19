@@ -164,6 +164,9 @@ func parsePattern(pattern string) ([]Matcher, error) {
 			}
 			symbol = NewCharacterGroup(pattern[i+1 : closing])
 			i = closing + 1
+		case '.':
+			symbol = Wildcard{}
+			i += 1
 		default:
 			symbol = Char(pattern[i])
 			i += 1
@@ -219,6 +222,12 @@ func (_ Word) matches(char rune) bool {
 	isLowerLetter := code >= 97 && code <= 122
 	isUnderscore := code == 95
 	return isDigit || isCapitalLetter || isLowerLetter || isUnderscore
+}
+
+type Wildcard struct{}
+
+func (_ Wildcard) matches(char rune) bool {
+	return true
 }
 
 type CharGroup struct {
