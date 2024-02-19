@@ -42,6 +42,7 @@ func TestGrep(t *testing.T) {
 		{"apple", `a+`, true},
 		{"SaaS", `a+`, true},
 		{"dog", `a+`, false},
+		{"cake", `cake+`, true},
 		{"baaadaaac", `a+e`, false},
 		{"baaad", `a+a`, true},
 	}

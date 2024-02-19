@@ -94,17 +94,17 @@ func matchHere(matchers []Matcher, text string, assertEnd bool) bool {
 	}
 
 	matcher := matchers[0]
-	c := rune(text[0])
-	if !matcher.symbol.matches(c) {
+	if !matcher.symbol.matches(rune(text[0])) {
 		return false
 	}
 
 	if matcher.quantifier != ' ' {
-		remainingStart := 0
-		for remainingStart < len(text) && matcher.symbol.matches(rune(text[remainingStart])) {
-			remainingStart += 1
+		for remainingStart := 1; remainingStart < len(text)+1; remainingStart++ {
 			if matchHere(matchers[1:], text[remainingStart:], assertEnd) {
 				return true
+			}
+			if !matcher.symbol.matches(rune(text[remainingStart])) {
+				break
 			}
 		}
 		return false
